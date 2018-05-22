@@ -39,6 +39,7 @@ import java.nio.ByteBuffer;
  */
 public class ImagePreprocessor {
     private static final boolean SAVE_PREVIEW_BITMAP = false;
+    private static final String TAG = "ImagePreprocessor";
 
     private Bitmap rgbFrameBitmap;
     private Bitmap croppedBitmap;

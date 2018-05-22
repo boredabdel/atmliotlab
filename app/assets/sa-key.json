@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "iot-ml-bootcamp-2018",
+  "private_key_id": "d8e39e517126bf6974a7e24b8c681fb721d49b7f",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC3q90dUOAi2bqx\nfdb1rL3c5FoCCtqvKwjrTeLBvP3MA8/LxxsvNNtrYe6Qr/cd0h4bZLtU1PKSz9bX\nQmtuJowdwU6pHsSNV6gmPwVtO1vZZn6uwr2RWNJ97/0J5cVj2JT0yfZ/rMlxeSS2\n5F1X8svJFqVo/8s1CYDwv77zFni1J33teAkrjKli2xTXZUAFtNJQQ/+CmGF0Wxun\nnnFZfUUaBQvJe804hru1wmVOWfdG/TkOr25eAiCjXJD7gJpoX9GSNwuwSSF+dtnT\naNtLIKYlzqbvb3+B/rGEs0Ph7gWKiI567uVFBAwFBXj+sY+Cg5AkEI5Hub+bdFqt\n87kqHNizAgMBAAECggEAQcFLH3AxVfi6AEord3e430h3Osz0/oo7HrabDD4jZHMm\n5O7qugtD1J1SYcVFhI0RT0BQWq4EC/BRm24BdQVi21I13ZEQ0ANGRS8Bu9no55ts\nlhdM86inbwPIhM8YTEchCMP3Nj0/PxsePEXkbxSSxXKQlFcjQmEdItOawn9UhpG6\nG0j4jA3PbXcq7LX7UePD/KTKDBOvBx0l2TEKzuSlbx5bCAdsYGdjjM34ks6Ts5jV\nDxvSoXw6o9X3yqNpeTWkkc24rjIjdWvLKYM0IUGekUA62b7fTeu0CfK1KZZswx0q\nYVIdXmyWR6TplMGtTNWv72SPUdnMRh4hO2BLUoBmjQKBgQDbZ1IPeLtNzR34E59Z\nWDBcMJBe2E9L/0UU3D8yavjxpiXw7bvywkS+TdES9EddycHAcQ3LUzzQ6nZJvJ/5\ncKz1Y9LcffjO0IQa7dYk4gzY3YTSabDL+6PyfmVB8gXxcAiM0R5UGl6a10H+Syi9\n8ky0uHILUCpYCul3j7SPhoEh5wKBgQDWTsCQjdpQ32t7km3PgRIHJK9b+1G1NTuX\n96fZCi6rvH9i44jx1G2O4A0Qdmr5LVBpxZ27y7vbC2K+lXWu4LgBzZMaGdkGiquM\n4fq4ab7jg9fPDmiYqgRf+4LSObaX2/Vz70ejFQKai5+lIILPvFEZw9+DADCD81kw\naAbdcxnRVQKBgEdno+RXJZZXiEZhlH3OXsbSI1pKydvw8zmryIGPIP/8U+LKbF3A\nbgEFcGLbz5IthHouERA4QdW4SNEMq3/R9OhUGZ8a/GvKnwPoncYZL5cw2PZl4V0x\nw5S7IBdLPjXqgU3bDSTQBDQelGK/cT4IaoByeuNFrtJCkuMPiPMhEkvHAoGATevi\nfmzlhWRG+25ZeQpwGKLRE/vEUMPjQDUvFW5rW8w08SrUP0HC+CEk/uhfquw8Acl1\nubOxQUrZg3xqhsR0g0tRAjuFuqgvChGcjPL+ElF85W9SvreK0a9seK29Y2f5zkah\nYH2iLbk4udyhU5EgV+LtYP9vpHqV4lDgtiJEr+UCgYAq4/d/JgRyXwGqrd0jHB+K\nYlaI47+U/oYioBu/nzEUsw8xMm+1R5MQ6q70YfEQYnR6pY+lWDmnDitRxOvSBdf2\nxbaGnI9LyQ4qeJF2Vk9IhyZNE9kfHt4Anb6wbht/aBDERMn6ogbuVF4/rLY8ItaY\nu/N0hvbvpPA0yVF1i+vrOg==\n-----END PRIVATE KEY-----\n",
+  "client_email": "iot-gcs-sa@iot-ml-bootcamp-2018.iam.gserviceaccount.com",
+  "client_id": "118386278187771313516",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://accounts.google.com/o/oauth2/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/iot-gcs-sa%40iot-ml-bootcamp-2018.iam.gserviceaccount.com"
+}

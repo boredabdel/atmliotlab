@@ -16,18 +16,21 @@
 package com.example.androidthings.imageclassifier;
 
 import android.app.Activity;
+import android.content.ComponentName;
 import android.content.Context;
-import android.content.pm.ActivityInfo;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.IBinder;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
@@ -37,15 +40,34 @@ import android.widget.TextView;
 
 import com.example.androidthings.imageclassifier.classifier.Recognition;
 import com.example.androidthings.imageclassifier.classifier.TensorFlowImageClassifier;
-import com.google.android.things.contrib.driver.button.Button;
+import com.example.androidthings.imageclassifier.cloud.iotcore.MqttAuthentication;
 import com.google.android.things.contrib.driver.button.ButtonInputDriver;
 import com.google.android.things.pio.Gpio;
-import com.google.android.things.pio.PeripheralManager;
 
+import com.example.androidthings.imageclassifier.cloud.pubsub.CloudPublisherService;
+import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.http.InputStreamContent;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.jackson.JacksonFactory;
+import com.google.api.services.storage.StorageScopes;
+import com.google.api.services.storage.model.StorageObject;
+import com.google.api.services.storage.Storage;
+
+import java.util.Properties;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URLConnection;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -53,11 +75,23 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ImageClassifierActivity extends Activity implements ImageReader.OnImageAvailableListener {
     private static final String TAG = "ImageClassifierActivity";
+    private static final String GCS_KEY_FILE_PATH = "sa-key.p12";
 
     private static final int PREVIEW_IMAGE_WIDTH = 640;
     private static final int PREVIEW_IMAGE_HEIGHT = 480;
     private static final int TF_INPUT_IMAGE_WIDTH = 224;
     private static final int TF_INPUT_IMAGE_HEIGHT = 224;
+    private static Storage sStorage;
+    private static Properties sProperties;
+    private static File gcsKeyFile;
+
+    private static final String PROJECT_ID_PROPERTY = "project.id";
+    private static final String APPLICATION_NAME_PROPERTY = "application.name";
+    private static final String ACCOUNT_ID_PROPERTY = "account.id";
+
+    private static final String PROJECT_ID =  "iot-ml-bootcamp-2018";
+    private static final String APPLICATION_NAME =  "ml-bootcamp";
+    private static final String ACCOUNT_ID = "iot-gcs-sa@iot-ml-bootcamp-2018.iam.gserviceaccount.com";
 
     /* Key code used by GPIO button to trigger image capture */
     private static final int SHUTTER_KEYCODE = KeyEvent.KEYCODE_CAMERA;
@@ -73,16 +107,24 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
 
     private ImageView mImage;
     private TextView mResultText;
+    private MqttAuthentication mqttAuth;
 
     private AtomicBoolean mReady = new AtomicBoolean(false);
     private ButtonInputDriver mButtonDriver;
     private Gpio mReadyLED;
+    private CloudPublisherService mPublishService;
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
+        try{
+            Log.i(TAG, "Reading GCS SA Key file");
+            AssetManager assets = getAssets();
+            gcsKeyFile = readFileFromStream(assets.open(GCS_KEY_FILE_PATH));
+        }catch(Exception e){
+            Log.i(TAG, "Failed Reading GCS SA Key file");
+        }
         setContentView(R.layout.activity_camera);
         mImage = findViewById(R.id.imageView);
         mResultText = findViewById(R.id.resultText);
@@ -92,32 +134,56 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
 
     private void init() {
         if (isAndroidThingsDevice(this)) {
-            initPIO();
         }
 
+        mqttAuth = new MqttAuthentication();
+        mqttAuth.initialize();
+        if( Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
+            Log.i(TAG, "External Storage Stat " + Environment.getExternalStorageState());
+            try {
+                Log.i(TAG, "Exporting key to " + Environment.getExternalStorageDirectory());
+                mqttAuth.exportPublicKey(new File(Environment.getExternalStorageDirectory(),
+                        "cloud_iot_auth_certificate.pem"));
+            } catch (GeneralSecurityException | IOException e) {
+                if( e instanceof FileNotFoundException && e.getMessage().contains("Permission denied")) {
+                    Log.e(TAG, "Unable to export certificate, may need to reboot to receive WRITE permissions?", e);
+                } else {
+                    Log.e(TAG, "Unable to export certificate", e);
+                }
+            }
+        }
         mBackgroundThread = new HandlerThread("BackgroundThread");
         mBackgroundThread.start();
         mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
         mBackgroundHandler.post(mInitializeOnBackground);
+
     }
 
-    /**
-     * This method should only be called when running on an Android Things device.
-     */
-    private void initPIO() {
-        PeripheralManager pioManager = PeripheralManager.getInstance();
-        try {
-            mReadyLED = pioManager.openGpio(BoardDefaults.getGPIOForLED());
-            mReadyLED.setDirection(Gpio.DIRECTION_OUT_INITIALLY_LOW);
-            mButtonDriver = new ButtonInputDriver(
-                    BoardDefaults.getGPIOForButton(),
-                    Button.LogicState.PRESSED_WHEN_LOW,
-                    SHUTTER_KEYCODE);
-            mButtonDriver.register();
-        } catch (IOException e) {
-            mButtonDriver = null;
-            Log.w(TAG, "Could not open GPIO pins", e);
+//    private void initializeServiceIfNeeded() {
+//        if (mPublishService == null) {
+//            try {
+//                // Bind to the service
+//                Intent intent = new Intent(this, CloudPublisherService.class);
+//                bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
+//            } catch (Throwable t) {
+//                Log.e(TAG, "Could not connect to the service, will try again later", t);
+//            }
+//        }
+//    }
+
+    private File readFileFromStream(InputStream inStream){
+        File tempFile = new File(getCacheDir()+"/file");
+        try{
+            byte[] buffer = new byte[4096];
+            inStream.read(buffer);
+            inStream.close();
+            FileOutputStream KeyFileOutStream = new FileOutputStream(tempFile);
+            KeyFileOutStream.write(buffer);
+            KeyFileOutStream.close();
+        }catch(IOException e){
+            Log.e(TAG, "Unable to read file from Stream");
         }
+        return tempFile;
     }
 
     private Runnable mInitializeOnBackground = new Runnable() {
@@ -232,6 +298,50 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         }
     }
 
+    private static Properties getProperties() throws Exception {
+        if (sProperties == null) {
+            sProperties = new Properties();
+            sProperties.setProperty(PROJECT_ID_PROPERTY, PROJECT_ID);
+            sProperties.setProperty(APPLICATION_NAME_PROPERTY, APPLICATION_NAME);
+            sProperties.setProperty(ACCOUNT_ID_PROPERTY, ACCOUNT_ID);
+        }
+        return sProperties;
+    }
+
+    private static Storage getStorage() {
+        if (sStorage == null) {
+            HttpTransport httpTransport = new NetHttpTransport();
+            JsonFactory jsonFactory = new JacksonFactory();
+            List<String> scopes = new ArrayList<>();
+            scopes.add(StorageScopes.DEVSTORAGE_FULL_CONTROL);
+            try {
+                Credential credential = new GoogleCredential.Builder()
+                        .setTransport(httpTransport)
+                        .setJsonFactory(jsonFactory)
+                        .setServiceAccountId(
+                                getProperties().getProperty(ACCOUNT_ID_PROPERTY))
+                        .setServiceAccountPrivateKeyFromP12File(gcsKeyFile)
+                        .setServiceAccountScopes(scopes).build();
+
+                sStorage = new Storage.Builder(httpTransport, jsonFactory,
+                        credential).setApplicationName(
+                        getProperties().getProperty(APPLICATION_NAME_PROPERTY))
+                        .build();
+            }catch (Exception e){
+                Log.e(TAG, "ERROR: " + e.toString());
+            }
+        }
+        try{
+            Log.i(TAG, "Storage Object: " + sStorage.buckets().
+                    list(getProperties().getProperty(PROJECT_ID_PROPERTY)).execute().getItems());
+
+        }catch (Exception e){
+            Log.e(TAG, "Error talking to Storage");
+        }
+
+        return sStorage;
+    }
+
     @Override
     public void onImageAvailable(ImageReader reader) {
         final Bitmap bitmap;
@@ -245,6 +355,49 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                 mImage.setImageBitmap(bitmap);
             }
         });
+
+        //Write Image to Storage.
+        Log.i(TAG, "Trying to write image to local storage");
+        File destination = new File(Environment.getExternalStorageDirectory().toString());
+        try{
+            FileOutputStream os = new FileOutputStream(destination + "/output.jpg");
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 75, os);
+            os.flush();
+            os.close();
+            Log.i(TAG, "Image written to local storage " + destination + "/output.jpg");
+        }catch (FileNotFoundException e){
+            Log.e(TAG,"Destination not found " + destination);
+        }catch(IOException e){
+            Log.e(TAG,"Error writing file to storage " + destination);
+        }
+
+        //Send the Image to GCS.
+        Log.i(TAG, "Trying to write image to GCS");
+        try{
+            Storage storage = getStorage();
+            String bucket_name = "at-test-upload01";
+            File file = new File("/storage/emulated/0/output.jpg");
+            FileInputStream stream = new FileInputStream(file);
+                try {
+                    StorageObject objectMetadata = new StorageObject();
+                    objectMetadata.setBucket(bucket_name);
+                    String contentType = URLConnection.guessContentTypeFromStream(stream);
+                    InputStreamContent content = new InputStreamContent(contentType, stream);
+                    Storage.Objects.Insert insert = storage.objects().insert(
+                            bucket_name, objectMetadata, content);
+                    insert.setName(file.getName());
+                    insert.execute();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error writing file to GCS "+e.toString());
+                } finally {
+                    stream.close();
+                }
+        }catch (FileNotFoundException e){
+            Log.e(TAG, "File Not Found" + e.toString());
+        }catch (IOException e){
+            Log.e(TAG, "IO Stream Error " + e.toString());
+        }
+
 
         final Collection<Recognition> results = mTensorFlowClassifier.doRecognize(bitmap);
 
@@ -330,4 +483,25 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         Log.d(TAG, "isRunningAndroidThings: " + isRunningAndroidThings);
         return isRunningAndroidThings;
     }
+
+    /**
+     * Callback for service binding, passed to bindService()
+     */
+    private ServiceConnection mServiceConnection = new ServiceConnection() {
+
+        @Override
+        public void onServiceConnected(ComponentName className,
+                                       IBinder service) {
+            CloudPublisherService.LocalBinder binder = (CloudPublisherService.LocalBinder) service;
+            mPublishService = binder.getService();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName arg0) {
+            mPublishService = null;
+        }
+    };
+
+
+
 }
