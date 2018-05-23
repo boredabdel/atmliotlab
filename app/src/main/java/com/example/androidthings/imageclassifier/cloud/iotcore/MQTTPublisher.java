@@ -21,8 +21,6 @@ import android.support.annotation.NonNull;
 import android.util.Log;
 
 import com.example.androidthings.imageclassifier.cloud.pubsub.CloudPublisher;
-//import com.example.androidthings.sensorhub.SensorData;
-//import com.example.androidthings.sensorhub.cloud.MessagePayload;
 
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
@@ -35,7 +33,6 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -122,7 +119,25 @@ public class MQTTPublisher implements CloudPublisher {
     }
 
     @Override
-    public void publish(List data) {
+    public void publish(String data) {
+        try {
+            if (isReady()) {
+                if (mqttClient != null && !mqttClient.isConnected()) {
+                    // if for some reason the mqtt client has disconnected, we should try to connect
+                    // it again.
+                    try {
+                        initializeMqttClient();
+                    } catch (MqttException | IOException | GeneralSecurityException e) {
+                        throw new IllegalArgumentException("Could not initialize MQTT", e);
+                    }
+                }
+                String payload = MessagePayload.createMessagePayload(data);
+                Log.d(TAG, "Publishing: "+payload);
+                sendMessage(cloudIotOptions.getTopicName(), payload.getBytes());
+            }
+        } catch (MqttException e) {
+            throw new IllegalArgumentException("Could not send message", e);
+        }
     }
 
     @Override

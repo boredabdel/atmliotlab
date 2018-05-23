@@ -49,9 +49,6 @@
 -->
         </activity>
 
-        <!-- Use tools:replace to stop the contrib-driver dependency from overriding our
-         required="false" setting.
-         Source: https://github.com/androidthings/new-project-template/issues/1#issuecomment-309288101 -->
         <uses-library android:name="com.google.android.things"
             android:required="false"
             tools:replace="android:required" />

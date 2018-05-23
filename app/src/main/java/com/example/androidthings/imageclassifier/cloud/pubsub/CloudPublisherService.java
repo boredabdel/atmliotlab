@@ -72,28 +72,28 @@ public class CloudPublisherService extends Service {
     private final ConcurrentHashMap<String, PriorityBlockingQueue<SensorData>> mOnChangeData =
             new ConcurrentHashMap<>();
 
-    private final Runnable mSensorConsumerRunnable = new Runnable() {
-        @Override
-        public void run() {
-            long delayForNextTentative = PUBLISH_INTERVAL_MS;
-            try {
-                initializeIfNeeded();
-                processCollectedSensorData();
-                mUnsuccessfulTentatives.set(0);
-            } catch (Throwable t) {
-                if (mUnsuccessfulTentatives.get() >= ERRORS_TO_INITIATE_BACKOFF) {
-                    delayForNextTentative = BACKOFF_INTERVAL_MS;
-                } else {
-                    mUnsuccessfulTentatives.incrementAndGet();
-                }
-                Log.e(TAG, String.format(Locale.getDefault(),
-                        "Cannot publish. %d unsuccessful tentatives, will try again in %d ms",
-                        mUnsuccessfulTentatives.get(), delayForNextTentative), t);
-            } finally {
-                mServiceHandler.postDelayed(this, delayForNextTentative);
-            }
-        }
-    };
+//    private final Runnable mSensorConsumerRunnable = new Runnable() {
+//        @Override
+//        public void run() {
+//            long delayForNextTentative = PUBLISH_INTERVAL_MS;
+//            try {
+//                initializeIfNeeded();
+//                processCollectedSensorData();
+//                mUnsuccessfulTentatives.set(0);
+//            } catch (Throwable t) {
+//                if (mUnsuccessfulTentatives.get() >= ERRORS_TO_INITIATE_BACKOFF) {
+//                    delayForNextTentative = BACKOFF_INTERVAL_MS;
+//                } else {
+//                    mUnsuccessfulTentatives.incrementAndGet();
+//                }
+//                Log.e(TAG, String.format(Locale.getDefault(),
+//                        "Cannot publish. %d unsuccessful tentatives, will try again in %d ms",
+//                        mUnsuccessfulTentatives.get(), delayForNextTentative), t);
+//            } finally {
+//                mServiceHandler.postDelayed(this, delayForNextTentative);
+//            }
+//        }
+//    };
 
     /**
      * Store sensor data so that it can be published in the next publishing cycle. Unlike
@@ -140,26 +140,26 @@ public class CloudPublisherService extends Service {
         }
     }
 
-    @WorkerThread
-    private void processCollectedSensorData() {
-        if (mPublisher == null || !mPublisher.isReady()) {
-            return;
-        }
-        ArrayList<SensorData> data = new ArrayList<>();
-
-        // get sensorData from continuous sensors
-        for (String sensorName : mMostRecentData.keySet()) {
-            data.add(mMostRecentData.remove(sensorName));
-        }
-
-        // get sensorData from onChange sensors
-        for (String sensorName : mOnChangeData.keySet()) {
-            mOnChangeData.get(sensorName).drainTo(data);
-        }
-
-        Log.i(TAG, "publishing " + data.size() + " sensordata elements");
-        mPublisher.publish(data);
-    }
+    //@WorkerThread
+//    private void processCollectedSensorData() {
+//        if (mPublisher == null || !mPublisher.isReady()) {
+//            return;
+//        }
+//        ArrayList<SensorData> data = new ArrayList<>();
+//
+//        // get sensorData from continuous sensors
+//        for (String sensorName : mMostRecentData.keySet()) {
+//            data.add(mMostRecentData.remove(sensorName));
+//        }
+//
+//        // get sensorData from onChange sensors
+//        for (String sensorName : mOnChangeData.keySet()) {
+//            mOnChangeData.get(sensorName).drainTo(data);
+//        }
+//
+//        Log.i(TAG, "publishing " + data.size() + " sensordata elements");
+//        mPublisher.publish(data);
+//    }
 
     // Support for service binding
     private final IBinder mBinder = new CloudPublisherService.LocalBinder();
@@ -197,7 +197,7 @@ public class CloudPublisherService extends Service {
         thread.start();
         mServiceLooper = thread.getLooper();
         mServiceHandler = new Handler(mServiceLooper);
-        mServiceHandler.postDelayed(mSensorConsumerRunnable, PUBLISH_INTERVAL_MS);
+       // mServiceHandler.postDelayed(mSensorConsumerRunnable, PUBLISH_INTERVAL_MS);
     }
 
     private void initializeIfNeeded() {

@@ -76,6 +76,13 @@ public class CloudIotOptions {
      */
     private short bridgePort = DEFAULT_BRIDGE_PORT;
 
+    public CloudIotOptions(String projectId, String registryId, String deviceId, String cloudRegion){
+        this.projectId = projectId;
+        this.registryId = registryId;
+        this.deviceId = deviceId;
+        this.cloudRegion = cloudRegion;
+    }
+
 
 
     public String getBrokerUrl() {

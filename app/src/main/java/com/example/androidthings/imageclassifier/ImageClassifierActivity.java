@@ -36,11 +36,15 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.example.androidthings.imageclassifier.classifier.Recognition;
 import com.example.androidthings.imageclassifier.classifier.TensorFlowImageClassifier;
+import com.example.androidthings.imageclassifier.cloud.iotcore.CloudIotOptions;
+import com.example.androidthings.imageclassifier.cloud.iotcore.MQTTPublisher;
 import com.example.androidthings.imageclassifier.cloud.iotcore.MqttAuthentication;
+import com.example.androidthings.imageclassifier.cloud.pubsub.CloudPublisher;
 import com.google.android.things.contrib.driver.button.ButtonInputDriver;
 import com.google.android.things.pio.Gpio;
 
@@ -56,6 +60,7 @@ import com.google.api.services.storage.StorageScopes;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.api.services.storage.Storage;
 
+import java.util.Date;
 import java.util.Properties;
 
 import java.io.File;
@@ -74,9 +79,13 @@ import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ImageClassifierActivity extends Activity implements ImageReader.OnImageAvailableListener {
-    private static final String TAG = "ImageClassifierActivity";
     private static final String GCS_KEY_FILE_PATH = "sa-key.p12";
+    private static final String BUCKET_NAME = "at-test-upload01";
+    private static final String REGISTRY_ID = "myregistry";
+    private static final String DEVICE_ID = "mydevice";
+    private static final String CLOUD_REGION = "europe-west1";
 
+    private static final String TAG = "ImageClassifierActivity";
     private static final int PREVIEW_IMAGE_WIDTH = 640;
     private static final int PREVIEW_IMAGE_HEIGHT = 480;
     private static final int TF_INPUT_IMAGE_WIDTH = 224;
@@ -101,12 +110,17 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private TtsSpeaker mTtsSpeaker;
     private CameraHandler mCameraHandler;
     private TensorFlowImageClassifier mTensorFlowClassifier;
+    private String localFilePathInCache;
+    private String gcsFilePath;
+    private CloudPublisher mPublisher;
 
     private HandlerThread mBackgroundThread;
     private Handler mBackgroundHandler;
 
     private ImageView mImage;
     private TextView mResultText;
+    private LinearLayout mSendToCloudLayout;
+    private TextView mSendToCloudText;
     private MqttAuthentication mqttAuth;
 
     private AtomicBoolean mReady = new AtomicBoolean(false);
@@ -128,7 +142,8 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         setContentView(R.layout.activity_camera);
         mImage = findViewById(R.id.imageView);
         mResultText = findViewById(R.id.resultText);
-
+        mSendToCloudLayout = findViewById(R.id.sendToCloudLayout);
+        mSendToCloudText = findViewById(R.id.sendToCloudTxt);
         init();
     }
 
@@ -235,6 +250,54 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         }
     };
 
+    private Runnable mBackgroundUploadToGcsHandler = new Runnable() {
+        @Override
+        public void run() {
+            //Send the Image to GCS.
+            Log.i(TAG, "Trying to write image to GCS");
+            try{
+                Storage storage = getStorage();
+                File file = new File(localFilePathInCache);
+                FileInputStream stream = new FileInputStream(file);
+                try {
+                    StorageObject objectMetadata = new StorageObject();
+                    objectMetadata.setBucket(BUCKET_NAME);
+                    String contentType = URLConnection.guessContentTypeFromStream(stream);
+                    InputStreamContent content = new InputStreamContent(contentType, stream);
+                    Storage.Objects.Insert insert = storage.objects().insert(
+                            BUCKET_NAME, objectMetadata, content);
+                    insert.setName(file.getName());
+                    insert.execute();
+                    gcsFilePath = "gs://" + BUCKET_NAME + "/" + file.getName();
+                    Log.i(TAG, "File uploaded to GCS Successfully : " + gcsFilePath);
+                    //Try to Publish to PubSub
+                    Log.i(TAG, "Sending Info to Pub Sub : ");
+                    CloudIotOptions cloudIotOptions =
+                            new CloudIotOptions(PROJECT_ID, REGISTRY_ID, DEVICE_ID, CLOUD_REGION);
+                    mPublisher = new MQTTPublisher(cloudIotOptions);
+                    mPublisher.publish(gcsFilePath);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error writing file to GCS "+e.toString());
+                } finally {
+                    stream.close();
+                }
+            }catch (FileNotFoundException e){
+                Log.e(TAG, "File Not Found" + e.toString());
+            }catch (IOException e){
+                Log.e(TAG, "IO Stream Error " + e.toString());
+            }
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    mSendToCloudText.setText("");
+                    mSendToCloudLayout.setVisibility(View.INVISIBLE);
+                }
+            });
+            setReady(true);
+
+        }
+    };
+
     private UtteranceProgressListener utteranceListener = new UtteranceProgressListener() {
         @Override
         public void onStart(String utteranceId) {
@@ -268,6 +331,15 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     public void onShutterClick(View view) {
         Log.d(TAG, "Received screen tap");
         startImageCapture();
+    }
+
+    public void onSendToCloudClick(View view) {
+        Log.i(TAG, "Received a request to send to image in cache to Cloud");
+        if(mReady.get()) {
+            setReady(false);
+            mSendToCloudText.setText("Uploading to GCS...");
+            mBackgroundHandler.post(mBackgroundUploadToGcsHandler);
+        }
     }
 
     /**
@@ -328,17 +400,9 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                         getProperties().getProperty(APPLICATION_NAME_PROPERTY))
                         .build();
             }catch (Exception e){
-                Log.e(TAG, "ERROR: " + e.toString());
+                Log.e(TAG, "ERROR Getting a Storage Object: " + e.toString());
             }
         }
-        try{
-            Log.i(TAG, "Storage Object: " + sStorage.buckets().
-                    list(getProperties().getProperty(PROJECT_ID_PROPERTY)).execute().getItems());
-
-        }catch (Exception e){
-            Log.e(TAG, "Error talking to Storage");
-        }
-
         return sStorage;
     }
 
@@ -356,48 +420,23 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
             }
         });
 
-        //Write Image to Storage.
-        Log.i(TAG, "Trying to write image to local storage");
-        File destination = new File(Environment.getExternalStorageDirectory().toString());
+        //Write Image to local Cache.
+        Log.i(TAG, "Trying to write image to local cache....");
+        File cachePath= new File(getCacheDir().toString());
+        Long ts = System.currentTimeMillis();
+        String filePath = cachePath + "/" + ts.toString() + ".jpg";
         try{
-            FileOutputStream os = new FileOutputStream(destination + "/output.jpg");
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 75, os);
+            FileOutputStream os = new FileOutputStream(filePath);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 10, os);
             os.flush();
             os.close();
-            Log.i(TAG, "Image written to local storage " + destination + "/output.jpg");
+            Log.i(TAG, "Image written to local Cache: " + filePath);
+            localFilePathInCache = filePath;
         }catch (FileNotFoundException e){
-            Log.e(TAG,"Destination not found " + destination);
+            Log.e(TAG,"Destination not found: " + filePath);
         }catch(IOException e){
-            Log.e(TAG,"Error writing file to storage " + destination);
+            Log.e(TAG,"Error writing file to Cache: " + filePath);
         }
-
-        //Send the Image to GCS.
-        Log.i(TAG, "Trying to write image to GCS");
-        try{
-            Storage storage = getStorage();
-            String bucket_name = "at-test-upload01";
-            File file = new File("/storage/emulated/0/output.jpg");
-            FileInputStream stream = new FileInputStream(file);
-                try {
-                    StorageObject objectMetadata = new StorageObject();
-                    objectMetadata.setBucket(bucket_name);
-                    String contentType = URLConnection.guessContentTypeFromStream(stream);
-                    InputStreamContent content = new InputStreamContent(contentType, stream);
-                    Storage.Objects.Insert insert = storage.objects().insert(
-                            bucket_name, objectMetadata, content);
-                    insert.setName(file.getName());
-                    insert.execute();
-                } catch (Exception e) {
-                    Log.e(TAG, "Error writing file to GCS "+e.toString());
-                } finally {
-                    stream.close();
-                }
-        }catch (FileNotFoundException e){
-            Log.e(TAG, "File Not Found" + e.toString());
-        }catch (IOException e){
-            Log.e(TAG, "IO Stream Error " + e.toString());
-        }
-
 
         final Collection<Recognition> results = mTensorFlowClassifier.doRecognize(bitmap);
 
@@ -423,6 +462,11 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                         }
                     }
                     mResultText.setText(sb.toString());
+                    //Show the option to send picture to Cloud
+                    if(localFilePathInCache != null){
+                        mSendToCloudText.setText("Send To Cloud");
+                        mSendToCloudLayout.setVisibility(View.VISIBLE);
+                    }
                 }
             }
         });

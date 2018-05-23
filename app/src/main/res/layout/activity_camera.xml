@@ -50,4 +50,29 @@
             android:textStyle="bold"
             tools:text="@string/help_message" />
     </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/sendToCloudLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="80dp"
+        android:background="@android:color/holo_green_dark"
+        android:onClick="onSendToCloudClick"
+        android:orientation="horizontal"
+        android:visibility="invisible">
+
+        <TextView
+            android:id="@+id/sendToCloudTxt"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:contentDescription="@string/sendtocloud"
+            android:text="@string/sendtocloud"
+            android:textColor="@android:color/white"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            tools:text="@string/sendtocloud" />
+    </LinearLayout>
 </RelativeLayout>
