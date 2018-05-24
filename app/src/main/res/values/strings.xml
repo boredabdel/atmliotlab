@@ -18,6 +18,10 @@
     <string name="description_info">Info</string>
     <string name="request_permission">This sample needs camera permission.</string>
     <string name="camera_error">This device doesn\'t support Camera2 API.</string>
-    <string name="help_message">Press the button or touch the screen</string>
+    <string name="help_message">Point the camera and touch the screen</string>
     <string name="sendtocloud">Send To Cloud</string>
+    <string name="cancel">cancel</string>
+    <string name="marsText">Mars</string>
+    <string name="bountyText">Bounty</string>
+    <string name="confirmSendTxt">Send</string>
 </resources>

@@ -35,8 +35,8 @@ public class TensorFlowImageClassifier {
 
     private static final String TAG = "TFImageClassifier";
 
-    private static final String LABELS_FILE = "labels.txt";
-    private static final String MODEL_FILE = "mobilenet_quant_v1_224.tflite";
+    private static final String LABELS_FILE = "retrained_labels.txt";
+    private static final String MODEL_FILE = "retrained_graph.tflite";
 
     /** Dimensions of inputs. */
     private static final int DIM_BATCH_SIZE = 1;
@@ -67,7 +67,7 @@ public class TensorFlowImageClassifier {
 
         imgData =
                 ByteBuffer.allocateDirect(
-                        DIM_BATCH_SIZE * inputImageWidth * inputImageHeight * DIM_PIXEL_SIZE);
+                        4 * DIM_BATCH_SIZE * inputImageWidth * inputImageHeight * DIM_PIXEL_SIZE);
         imgData.order(ByteOrder.nativeOrder());
         confidencePerLabel = new byte[1][labels.size()];
 

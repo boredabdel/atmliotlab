@@ -57,22 +57,70 @@
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:layout_marginBottom="80dp"
+        android:layout_marginBottom="90dp"
         android:background="@android:color/holo_green_dark"
         android:onClick="onSendToCloudClick"
         android:orientation="horizontal"
         android:visibility="invisible">
 
-        <TextView
-            android:id="@+id/sendToCloudTxt"
+        <Button
+            android:id="@+id/sendToCloudBtn"
+            style="@android:style/Widget.DeviceDefault.Button"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:contentDescription="@string/sendtocloud"
+            android:onClick="onSendToCloudClick"
             android:text="@string/sendtocloud"
-            android:textColor="@android:color/white"
-            android:textSize="30sp"
-            android:textStyle="bold"
-            tools:text="@string/sendtocloud" />
+            android:visibility="visible" />
+
+        <Button
+            android:id="@+id/confirmSendBtn"
+            style="@android:style/Widget.DeviceDefault.Button"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:onClick="onConfirmSendClick"
+            android:text="@string/confirmSendTxt"
+            android:visibility="invisible"
+            tools:text="@string/confirmSendTxt" />
+
+        <Button
+            android:id="@+id/cancelBtn"
+            style="@android:style/Widget.DeviceDefault.Button"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:onClick="onCancelClick"
+            android:text="@string/cancel"
+            android:visibility="visible" />
+
     </LinearLayout>
+
+    <RadioGroup
+        android:id="@+id/labelButtons"
+        android:layout_width="216dp"
+        android:layout_height="67dp"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="41dp"
+        android:visibility="invisible">
+
+        <RadioButton
+            android:id="@+id/marsLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:checked="true"
+            android:text="@string/marsText"
+            tools:text="@string/marsText" />
+
+        <RadioButton
+            android:id="@+id/bountyLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/bountyText"
+            tools:text="@string/bountyText" />
+    </RadioGroup>
+
 </RelativeLayout>

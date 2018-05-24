@@ -95,7 +95,6 @@ public class MqttAuthentication {
         certificate = ks.getCertificate(keyAlias);
       }
       Log.i(TAG, "loaded certificate: " + keyAlias);
-
       if (certificate instanceof X509Certificate) {
         X509Certificate x509Certificate = (X509Certificate) certificate;
         Log.d(TAG, "Subject: " + x509Certificate.getSubjectX500Principal().toString());

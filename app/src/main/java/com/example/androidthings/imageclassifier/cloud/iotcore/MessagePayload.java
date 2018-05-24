@@ -27,13 +27,14 @@ public class MessagePayload {
 
     /**
      * Serialize a List of SensorData objects into a JSON string, for sending to the cloud
-     * @param data List of SensorData objects to serialize
+     * @param gcsFilePath GCS File path
      * @return JSON String
      */
-    public static String createMessagePayload(String data) {
+    public static String createMessagePayload(String gcsFilePath, String label) {
         try {
             JSONObject messagePayload = new JSONObject();
-            messagePayload.put("file", data);
+            messagePayload.put("filePath", gcsFilePath);
+            messagePayload.put("label", label);
             return messagePayload.toString();
         } catch (JSONException e) {
             throw new IllegalArgumentException("Invalid message");

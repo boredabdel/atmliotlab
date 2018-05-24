@@ -119,7 +119,7 @@ public class MQTTPublisher implements CloudPublisher {
     }
 
     @Override
-    public void publish(String data) {
+    public void publish(String gcsFilePath, String label) {
         try {
             if (isReady()) {
                 if (mqttClient != null && !mqttClient.isConnected()) {
@@ -131,7 +131,7 @@ public class MQTTPublisher implements CloudPublisher {
                         throw new IllegalArgumentException("Could not initialize MQTT", e);
                     }
                 }
-                String payload = MessagePayload.createMessagePayload(data);
+                String payload = MessagePayload.createMessagePayload(gcsFilePath, label);
                 Log.d(TAG, "Publishing: "+payload);
                 sendMessage(cloudIotOptions.getTopicName(), payload.getBytes());
             }

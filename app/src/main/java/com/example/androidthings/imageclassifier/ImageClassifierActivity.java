@@ -29,14 +29,18 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
+import android.provider.MediaStore;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 
 import com.example.androidthings.imageclassifier.classifier.Recognition;
@@ -120,7 +124,9 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private ImageView mImage;
     private TextView mResultText;
     private LinearLayout mSendToCloudLayout;
-    private TextView mSendToCloudText;
+    private Button mSendToCloudButton;
+    private Button mConfirmSendButton;
+    private RadioGroup mLabelsRadio;
     private MqttAuthentication mqttAuth;
 
     private AtomicBoolean mReady = new AtomicBoolean(false);
@@ -143,14 +149,15 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         mImage = findViewById(R.id.imageView);
         mResultText = findViewById(R.id.resultText);
         mSendToCloudLayout = findViewById(R.id.sendToCloudLayout);
-        mSendToCloudText = findViewById(R.id.sendToCloudTxt);
+        mLabelsRadio = findViewById(R.id.labelButtons);
+        mSendToCloudButton = findViewById(R.id.sendToCloudBtn);
+        mConfirmSendButton = findViewById(R.id.confirmSendBtn);
         init();
     }
 
     private void init() {
         if (isAndroidThingsDevice(this)) {
         }
-
         mqttAuth = new MqttAuthentication();
         mqttAuth.initialize();
         if( Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
@@ -174,18 +181,6 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
 
     }
 
-//    private void initializeServiceIfNeeded() {
-//        if (mPublishService == null) {
-//            try {
-//                // Bind to the service
-//                Intent intent = new Intent(this, CloudPublisherService.class);
-//                bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
-//            } catch (Throwable t) {
-//                Log.e(TAG, "Could not connect to the service, will try again later", t);
-//            }
-//        }
-//    }
-
     private File readFileFromStream(InputStream inStream){
         File tempFile = new File(getCacheDir()+"/file");
         try{
@@ -207,28 +202,27 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
             mImagePreprocessor = new ImagePreprocessor(PREVIEW_IMAGE_WIDTH, PREVIEW_IMAGE_HEIGHT,
                     TF_INPUT_IMAGE_WIDTH, TF_INPUT_IMAGE_HEIGHT);
 
-            mTtsSpeaker = new TtsSpeaker();
-            mTtsSpeaker.setHasSenseOfHumor(true);
-            mTtsEngine = new TextToSpeech(ImageClassifierActivity.this,
-                    new TextToSpeech.OnInitListener() {
-                        @Override
-                        public void onInit(int status) {
-                            if (status == TextToSpeech.SUCCESS) {
-                                mTtsEngine.setLanguage(Locale.US);
-                                mTtsEngine.setOnUtteranceProgressListener(utteranceListener);
-                                mTtsSpeaker.speakReady(mTtsEngine);
-                            } else {
-                                Log.w(TAG, "Could not open TTS Engine (onInit status=" + status
-                                        + "). Ignoring text to speech");
-                                mTtsEngine = null;
-                            }
-                        }
-                    });
+//            mTtsSpeaker = new TtsSpeaker();
+//            mTtsSpeaker.setHasSenseOfHumor(true);
+//            mTtsEngine = new TextToSpeech(ImageClassifierActivity.this,
+//                    new TextToSpeech.OnInitListener() {
+//                        @Override
+//                        public void onInit(int status) {
+//                            if (status == TextToSpeech.SUCCESS) {
+//                                mTtsEngine.setLanguage(Locale.US);
+//                                mTtsEngine.setOnUtteranceProgressListener(utteranceListener);
+//                                mTtsSpeaker.speakReady(mTtsEngine);
+//                            } else {
+//                                Log.w(TAG, "Could not open TTS Engine (onInit status=" + status
+//                                        + "). Ignoring text to speech");
+//                                mTtsEngine = null;
+//                            }
+//                        }
+//                    });
             mCameraHandler = CameraHandler.getInstance();
             mCameraHandler.initializeCamera(ImageClassifierActivity.this,
                     PREVIEW_IMAGE_WIDTH, PREVIEW_IMAGE_HEIGHT, mBackgroundHandler,
                     ImageClassifierActivity.this);
-
             try {
                 mTensorFlowClassifier = new TensorFlowImageClassifier(ImageClassifierActivity.this,
                         TF_INPUT_IMAGE_WIDTH, TF_INPUT_IMAGE_HEIGHT);
@@ -256,6 +250,11 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
             //Send the Image to GCS.
             Log.i(TAG, "Trying to write image to GCS");
             try{
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() { mResultText.setText("Uploading Image to GCS....");
+                    }
+                });
                 Storage storage = getStorage();
                 File file = new File(localFilePathInCache);
                 FileInputStream stream = new FileInputStream(file);
@@ -271,11 +270,20 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                     gcsFilePath = "gs://" + BUCKET_NAME + "/" + file.getName();
                     Log.i(TAG, "File uploaded to GCS Successfully : " + gcsFilePath);
                     //Try to Publish to PubSub
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() { mResultText.setText("Posting to PubSub....");
+                        }
+                    });
                     Log.i(TAG, "Sending Info to Pub Sub : ");
+                    int selectedId = mLabelsRadio.getCheckedRadioButtonId();
+                    RadioButton selected = findViewById(selectedId);
+                    String selectedLabel = (String) selected.getText();
+                    Log.i(TAG, "Selected Label Label:" + selectedLabel);
                     CloudIotOptions cloudIotOptions =
                             new CloudIotOptions(PROJECT_ID, REGISTRY_ID, DEVICE_ID, CLOUD_REGION);
                     mPublisher = new MQTTPublisher(cloudIotOptions);
-                    mPublisher.publish(gcsFilePath);
+                    mPublisher.publish(gcsFilePath, selectedLabel.toLowerCase());
                 } catch (Exception e) {
                     Log.e(TAG, "Error writing file to GCS "+e.toString());
                 } finally {
@@ -289,12 +297,10 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    mSendToCloudText.setText("");
-                    mSendToCloudLayout.setVisibility(View.INVISIBLE);
+                    mResultText.setText(R.string.help_message);
                 }
             });
             setReady(true);
-
         }
     };
 
@@ -337,9 +343,41 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         Log.i(TAG, "Received a request to send to image in cache to Cloud");
         if(mReady.get()) {
             setReady(false);
-            mSendToCloudText.setText("Uploading to GCS...");
-            mBackgroundHandler.post(mBackgroundUploadToGcsHandler);
+            showLabels();
         }
+    }
+    public void onConfirmSendClick(View view){
+        mBackgroundHandler.post(mBackgroundUploadToGcsHandler);
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mLabelsRadio.setVisibility(View.INVISIBLE);
+                mConfirmSendButton.setVisibility(View.INVISIBLE);
+                mSendToCloudButton.setVisibility(View.VISIBLE);
+                mSendToCloudLayout.setVisibility(View.INVISIBLE);
+
+            }
+        });
+    }
+
+    public void onCancelClick(View view) {
+        Log.i(TAG, "Cancel send to Cloud");
+        mSendToCloudLayout.setVisibility(View.INVISIBLE);
+        mLabelsRadio.setVisibility(View.INVISIBLE);
+        mResultText.setText(R.string.help_message);
+        setReady(true);
+    }
+    private void showLabels(){
+        Log.i(TAG, "Showing labels");
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mLabelsRadio.setVisibility(View.VISIBLE);
+                mConfirmSendButton.setVisibility(View.VISIBLE);
+                mSendToCloudButton.setVisibility(View.INVISIBLE);
+                mResultText.setText("Pick a label and click Send");
+            }
+        });
     }
 
     /**
@@ -361,13 +399,6 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
      */
     private void setReady(boolean ready) {
         mReady.set(ready);
-        if (mReadyLED != null) {
-            try {
-                mReadyLED.setValue(ready);
-            } catch (IOException e) {
-                Log.w(TAG, "Could not set LED", e);
-            }
-        }
     }
 
     private static Properties getProperties() throws Exception {
@@ -464,21 +495,20 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                     mResultText.setText(sb.toString());
                     //Show the option to send picture to Cloud
                     if(localFilePathInCache != null){
-                        mSendToCloudText.setText("Send To Cloud");
                         mSendToCloudLayout.setVisibility(View.VISIBLE);
                     }
                 }
             }
         });
-
-        if (mTtsEngine != null) {
-            // speak out loud the result of the image recognition
-            mTtsSpeaker.speakResults(mTtsEngine, results);
-        } else {
-            // if theres no TTS, we don't need to wait until the utterance is spoken, so we set
-            // to ready right away.
-            setReady(true);
-        }
+        setReady(true);
+//        if (mTtsEngine != null) {
+//            // speak out loud the result of the image recognition
+//            mTtsSpeaker.speakResults(mTtsEngine, results);
+//        } else {
+//            // if theres no TTS, we don't need to wait until the utterance is spoken, so we set
+//            // to ready right away.
+//            setReady(true);
+//        }
     }
 
     @Override

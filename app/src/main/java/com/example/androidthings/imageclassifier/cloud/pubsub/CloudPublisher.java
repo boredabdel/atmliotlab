@@ -24,7 +24,7 @@ public interface CloudPublisher extends AutoCloseable {
 
     boolean isReady();
 
-    void publish(String data);
+    void publish(String gcsFilePath, String label);
 
     void reconfigure(CloudIotOptions options);
 }
