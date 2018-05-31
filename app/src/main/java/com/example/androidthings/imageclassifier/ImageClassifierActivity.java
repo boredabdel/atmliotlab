@@ -86,7 +86,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private static final String GCS_KEY_FILE_PATH = "sa-key.p12";
     private static final String BUCKET_NAME = "at-test-upload01";
     private static final String REGISTRY_ID = "myregistry";
-    private static final String DEVICE_ID = "mydevice";
+    private static final String DEVICE_ID = "mydevice4";
     private static final String CLOUD_REGION = "europe-west1";
 
     private static final String TAG = "ImageClassifierActivity";

@@ -75,7 +75,7 @@ public class TensorFlowHelper {
     /**
      * Find the best classifications.
       */
-    public static Collection<Recognition> getBestResults(byte[][] labelProbArray,
+    public static Collection<Recognition> getBestResults(float[][] labelProbArray,
                                                          List<String> labelList) {
         PriorityQueue<Recognition> sortedLabels = new PriorityQueue<>(RESULTS_TO_SHOW,
                 new Comparator<Recognition>() {
@@ -88,7 +88,7 @@ public class TensorFlowHelper {
 
         for (int i = 0; i < labelList.size(); ++i) {
             Recognition r = new Recognition( String.valueOf(i),
-                    labelList.get(i), (labelProbArray[0][i] & 0xff) / 255.0f);
+                    labelList.get(i), (labelProbArray[0][i]) / 255.0f);
             sortedLabels.add(r);
             if (r.getConfidence() > 0) {
                 Log.d("ImageRecognition", r.toString());

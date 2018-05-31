@@ -49,7 +49,7 @@ public class TensorFlowImageClassifier {
     private ByteBuffer imgData = null;
 
     /** Inference results (Tensorflow Lite output). */
-    private byte[][] confidencePerLabel = null;
+    private float[][] confidencePerLabel = null;
 
     /** Pre-allocated buffer for intermediate bitmap pixels */
     private int[] intValues;
@@ -69,7 +69,7 @@ public class TensorFlowImageClassifier {
                 ByteBuffer.allocateDirect(
                         4 * DIM_BATCH_SIZE * inputImageWidth * inputImageHeight * DIM_PIXEL_SIZE);
         imgData.order(ByteOrder.nativeOrder());
-        confidencePerLabel = new byte[1][labels.size()];
+        confidencePerLabel = new float[1][labels.size()];
 
         // Pre-allocate buffer for image pixels.
         intValues = new int[inputImageWidth * inputImageHeight];
