@@ -18,6 +18,8 @@ package com.example.androidthings.imageclassifier.cloud.pubsub;
 
 import com.example.androidthings.imageclassifier.cloud.iotcore.CloudIotOptions;
 
+import org.eclipse.paho.client.mqttv3.MqttClient;
+
 import java.util.List;
 
 public interface CloudPublisher extends AutoCloseable {
@@ -27,4 +29,6 @@ public interface CloudPublisher extends AutoCloseable {
     void publish(String gcsFilePath, String label);
 
     void reconfigure(CloudIotOptions options);
+
+    MqttClient getMqttClient();
 }

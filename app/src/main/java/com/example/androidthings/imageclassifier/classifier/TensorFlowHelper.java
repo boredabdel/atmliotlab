@@ -42,7 +42,7 @@ import java.util.PriorityQueue;
  */
 public class TensorFlowHelper {
 
-    private static final int RESULTS_TO_SHOW = 3;
+    private static final int RESULTS_TO_SHOW = 10;
 
     /**
      * Memory-map the model file in Assets.

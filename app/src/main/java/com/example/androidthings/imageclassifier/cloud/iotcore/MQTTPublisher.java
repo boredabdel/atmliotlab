@@ -27,6 +27,7 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -174,6 +175,20 @@ public class MQTTPublisher implements CloudPublisher {
 
         mqttClient.connect(options);
         mReady.set(true);
+    }
+
+    @Override
+    public  MqttClient getMqttClient() {
+        if (mqttClient != null && !mqttClient.isConnected()) {
+            // if for some reason the mqtt client has disconnected, we should try to connect
+            // it again.
+            try {
+                initializeMqttClient();
+            } catch (MqttException | IOException | GeneralSecurityException e) {
+                throw new IllegalArgumentException("Could not initialize MQTT", e);
+            }
+        }
+        return mqttClient;
     }
 
     private void sendMessage(String mqttTopic, byte[] mqttMessage) throws MqttException {

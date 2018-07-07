@@ -29,9 +29,6 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
-import android.provider.MediaStore;
-import android.speech.tts.TextToSpeech;
-import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
@@ -48,11 +45,16 @@ import com.example.androidthings.imageclassifier.classifier.TensorFlowImageClass
 import com.example.androidthings.imageclassifier.cloud.iotcore.CloudIotOptions;
 import com.example.androidthings.imageclassifier.cloud.iotcore.MQTTPublisher;
 import com.example.androidthings.imageclassifier.cloud.iotcore.MqttAuthentication;
-import com.example.androidthings.imageclassifier.cloud.pubsub.CloudPublisher;
-import com.google.android.things.contrib.driver.button.ButtonInputDriver;
-import com.google.android.things.pio.Gpio;
+
+import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
+import org.eclipse.paho.client.mqttv3.MqttCallback;
+import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.json.JSONObject;
 
 import com.example.androidthings.imageclassifier.cloud.pubsub.CloudPublisherService;
+import com.example.androidthings.imageclassifier.cloud.pubsub.CloudPublisher;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpTransport;
@@ -64,7 +66,8 @@ import com.google.api.services.storage.StorageScopes;
 import com.google.api.services.storage.model.StorageObject;
 import com.google.api.services.storage.Storage;
 
-import java.util.Date;
+
+import java.io.ByteArrayOutputStream;
 import java.util.Properties;
 
 import java.io.File;
@@ -79,14 +82,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ImageClassifierActivity extends Activity implements ImageReader.OnImageAvailableListener {
     private static final String GCS_KEY_FILE_PATH = "sa-key.p12";
     private static final String BUCKET_NAME = "at-test-upload01";
     private static final String REGISTRY_ID = "myregistry";
-    private static final String DEVICE_ID = "mydevice4";
+    private static final String DEVICE_ID = "newdevice";
     private static final String CLOUD_REGION = "europe-west1";
 
     private static final String TAG = "ImageClassifierActivity";
@@ -110,11 +112,10 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private static final int SHUTTER_KEYCODE = KeyEvent.KEYCODE_CAMERA;
 
     private ImagePreprocessor mImagePreprocessor;
-    private TextToSpeech mTtsEngine;
-    private TtsSpeaker mTtsSpeaker;
     private CameraHandler mCameraHandler;
     private TensorFlowImageClassifier mTensorFlowClassifier;
     private String localFilePathInCache;
+    private String localModelPathInCache;
     private String gcsFilePath;
     private CloudPublisher mPublisher;
 
@@ -128,11 +129,12 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private Button mConfirmSendButton;
     private RadioGroup mLabelsRadio;
     private MqttAuthentication mqttAuth;
+    private MqttClient mqttClient;
 
     private AtomicBoolean mReady = new AtomicBoolean(false);
-    private ButtonInputDriver mButtonDriver;
-    private Gpio mReadyLED;
     private CloudPublisherService mPublishService;
+    private static MqttCallback mCallback;
+    private static JSONObject mjsonObject;
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
@@ -178,8 +180,72 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         mBackgroundThread.start();
         mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
         mBackgroundHandler.post(mInitializeOnBackground);
+        CloudIotOptions cloudIotOptions =
+                new CloudIotOptions(PROJECT_ID, REGISTRY_ID, DEVICE_ID, CLOUD_REGION);
+        mPublisher = new MQTTPublisher(cloudIotOptions);
+        mqttClient = mPublisher.getMqttClient();
+        try {
+            Log.i(TAG, "Attaching callback for config change");
+            attachCallback(mqttClient, DEVICE_ID);
+        } catch (MqttException e){
+            Log.e(TAG, "Exception error " + e);
+        }
 
     }
+
+
+    /** Attaches the callback used when configuration changes occur. */
+    public  void attachCallback(MqttClient client, String deviceId) throws MqttException {
+        mCallback = new MqttCallback() {
+            @Override
+            public void connectionLost(Throwable cause) {
+                // Do nothing...
+            }
+
+            @Override
+            public void messageArrived(String topic, MqttMessage message) throws Exception {
+                String payload = new String(message.getPayload());
+                mjsonObject = new JSONObject(payload);
+                Log.i(TAG, "Received Payload" + mjsonObject.toString());
+                mBackgroundHandler.post(mBackgroundGetModelFromGCS);
+            }
+
+            @Override
+            public void deliveryComplete(IMqttDeliveryToken token) {
+                // Do nothing;
+            }
+        };
+
+        String configTopic = String.format("/devices/%s/config", deviceId);
+        client.subscribe(configTopic, 1);
+        client.setCallback(mCallback);
+    }
+
+    private Runnable mBackgroundGetModelFromGCS = new Runnable() {
+        @Override
+        public void run() {
+            //Send the Image to GCS.
+            Log.i(TAG, "Getting Model from GCS to write image to GCS");
+            try {
+                Storage storage = getStorage();
+                try {
+                    String bucket_name = mjsonObject.getString("bucket");
+                    Log.i(TAG, bucket_name);
+                    String model_file = mjsonObject.getString("model");
+                    Log.i(TAG, model_file);
+                    ByteArrayOutputStream modelStream = new ByteArrayOutputStream();
+                    Storage.Objects.Get getModel = storage.objects().get(bucket_name, model_file);
+                    getModel.getMediaHttpDownloader().setDirectDownloadEnabled(false);
+                    getModel.executeMediaAndDownloadTo(modelStream);
+                    Log.i(TAG, "Got Model File : " + modelStream.toString());
+                } catch (Exception e) {
+                    Log.e(TAG, "Error writing file to GCS " + e.toString());
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error " + e);
+            }
+        };
+    };
 
     private File readFileFromStream(InputStream inStream){
         File tempFile = new File(getCacheDir()+"/file");
@@ -201,24 +267,6 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         public void run() {
             mImagePreprocessor = new ImagePreprocessor(PREVIEW_IMAGE_WIDTH, PREVIEW_IMAGE_HEIGHT,
                     TF_INPUT_IMAGE_WIDTH, TF_INPUT_IMAGE_HEIGHT);
-
-//            mTtsSpeaker = new TtsSpeaker();
-//            mTtsSpeaker.setHasSenseOfHumor(true);
-//            mTtsEngine = new TextToSpeech(ImageClassifierActivity.this,
-//                    new TextToSpeech.OnInitListener() {
-//                        @Override
-//                        public void onInit(int status) {
-//                            if (status == TextToSpeech.SUCCESS) {
-//                                mTtsEngine.setLanguage(Locale.US);
-//                                mTtsEngine.setOnUtteranceProgressListener(utteranceListener);
-//                                mTtsSpeaker.speakReady(mTtsEngine);
-//                            } else {
-//                                Log.w(TAG, "Could not open TTS Engine (onInit status=" + status
-//                                        + "). Ignoring text to speech");
-//                                mTtsEngine = null;
-//                            }
-//                        }
-//                    });
             mCameraHandler = CameraHandler.getInstance();
             mCameraHandler.initializeCamera(ImageClassifierActivity.this,
                     PREVIEW_IMAGE_WIDTH, PREVIEW_IMAGE_HEIGHT, mBackgroundHandler,
@@ -237,9 +285,6 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private Runnable mBackgroundClickHandler = new Runnable() {
         @Override
         public void run() {
-            if (mTtsEngine != null) {
-                mTtsSpeaker.speakShutterSound(mTtsEngine);
-            }
             mCameraHandler.takePicture();
         }
     };
@@ -300,23 +345,6 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                     mResultText.setText(R.string.help_message);
                 }
             });
-            setReady(true);
-        }
-    };
-
-    private UtteranceProgressListener utteranceListener = new UtteranceProgressListener() {
-        @Override
-        public void onStart(String utteranceId) {
-            setReady(false);
-        }
-
-        @Override
-        public void onDone(String utteranceId) {
-            setReady(true);
-        }
-
-        @Override
-        public void onError(String utteranceId) {
             setReady(true);
         }
     };
@@ -458,7 +486,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         String filePath = cachePath + "/" + ts.toString() + ".jpg";
         try{
             FileOutputStream os = new FileOutputStream(filePath);
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 10, os);
+            //bitmap.compress(Bitmap.CompressFormat.JPEG, 10, os);
             os.flush();
             os.close();
             Log.i(TAG, "Image written to local Cache: " + filePath);
@@ -531,16 +559,6 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
             if (mTensorFlowClassifier != null) mTensorFlowClassifier.destroyClassifier();
         } catch (Throwable t) {
             // close quietly
-        }
-        try {
-            if (mButtonDriver != null) mButtonDriver.close();
-        } catch (Throwable t) {
-            // close quietly
-        }
-
-        if (mTtsEngine != null) {
-            mTtsEngine.stop();
-            mTtsEngine.shutdown();
         }
     }
 
