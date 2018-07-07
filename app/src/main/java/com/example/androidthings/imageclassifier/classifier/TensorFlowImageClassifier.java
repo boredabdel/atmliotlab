@@ -35,8 +35,8 @@ public class TensorFlowImageClassifier {
 
     private static final String TAG = "TFImageClassifier";
 
-    private static final String LABELS_FILE = "retrained_labels.txt";
-    private static final String MODEL_FILE = "retrained_graph.tflite";
+    private static final String LABELS_FILE = "labels.txt";
+    private static final String MODEL_FILE = "model.tflite";
 
     /** Dimensions of inputs. */
     private static final int DIM_BATCH_SIZE = 1;
