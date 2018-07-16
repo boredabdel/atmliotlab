@@ -31,6 +31,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -45,7 +46,7 @@ import java.util.PriorityQueue;
  */
 public class TensorFlowHelper {
 
-    private static final int RESULTS_TO_SHOW = 10;
+    private static final int RESULTS_TO_SHOW = 3;
     private static final int IMAGE_MEAN = 128;
     private static final float IMAGE_STD = 128.0f;
 
@@ -58,10 +59,9 @@ public class TensorFlowHelper {
         FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
         FileChannel fileChannel = inputStream.getChannel();
         long startOffset = fileDescriptor.getStartOffset();
-        Log.i("TF Helper", startOffset + "");
         long declaredLength = fileDescriptor.getDeclaredLength();
-        Log.i("TF Helper", declaredLength+ "");
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+        MappedByteBuffer out = fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+        return out;
     }
 
     public static List<String> readLabels(Context context, String labelsFile) {
@@ -81,13 +81,14 @@ public class TensorFlowHelper {
 
     public static MappedByteBuffer loadModelFileFromCache(String modelFilePath)
             throws IOException {
-        Log.i("TF Help", modelFilePath);
         File modelFile = new File(modelFilePath);
         FileInputStream inputStream = new FileInputStream(modelFile);
-        Log.i("TF Helper", inputStream + "");
         FileChannel fileChannel = inputStream.getChannel();
         long declaredLength =fileChannel.size();
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, declaredLength);
+        long offset = fileChannel.position();
+        MappedByteBuffer out = new RandomAccessFile(modelFilePath, "r").getChannel().map(
+                FileChannel.MapMode.READ_ONLY, offset,declaredLength);
+        return out;
     }
 
     public static List<String> readLabelsFromCache(String labelsFile) {

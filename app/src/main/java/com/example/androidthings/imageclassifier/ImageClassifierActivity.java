@@ -105,7 +105,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
 
 
     private static final String DEFAULT_LABELS_FILE = "labels.txt";
-    private static final String DEDAULT_MODEL_FILE = "model.tflite";
+    private static final String DEFAULT_MODEL_FILE = "model.tflite";
 
 
     /* Key code used by GPIO button to trigger image capture */
@@ -241,12 +241,12 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
             String modelFileName = "";
             String labelsFileName = "";
             File cachePath = new File(getCacheDir().toString());
-            try{
+            try {
                 bucketName = mJsonObject.getString("bucket");
                 modelFileName = mJsonObject.getString("model");
                 labelsFileName = mJsonObject.getString("labels");
-            }catch(JSONException ex){
-                Log.e(TAG,"Error parsing Json payload" + mJsonObject);
+            } catch (JSONException ex) {
+                Log.e(TAG, "Error parsing Json payload" + mJsonObject);
             }
             try {
                 Storage storage = getStorage();
@@ -258,7 +258,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                     getModel.executeMediaAndDownloadTo(modelStream);
                     // Writing Model file to Local Cache
                     String modelFilePath = cachePath + "/" + modelFileName;
-                    Log.i(TAG,"Writing Model to Local Cache: " + modelFilePath.toString());
+                    Log.i(TAG, "Writing Model file to Local Cache: " + modelFilePath.toString());
                     FileOutputStream modelFileFos = new FileOutputStream(modelFilePath);
                     modelStream.writeTo(modelFileFos);
                     modelFileFos.flush();
@@ -271,7 +271,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                     getLabels.executeMediaAndDownloadTo(labelsStream);
                     // Writing Model file to Local Cache
                     String labelsFilePath = cachePath + "/" + labelsFileName;
-                    Log.i(TAG,"Writing Model to Local Cache: " + labelsFilePath.toString());
+                    Log.i(TAG, "Writing Labels file to Local Cache: " + labelsFilePath.toString());
                     FileOutputStream labelsFileFos = new FileOutputStream(labelsFilePath);
                     labelsStream.writeTo(labelsFileFos);
                     labelsFileFos.flush();
@@ -279,19 +279,17 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
 
                     // ReInitialize the TF model
                     try {
+                        Log.i(TAG, "Re-Initializing TF Classifier");
                         mTensorFlowClassifier = new TensorFlowImageClassifier(ImageClassifierActivity.this,
                                 modelFilePath, labelsFilePath, TF_INPUT_IMAGE_WIDTH, TF_INPUT_IMAGE_HEIGHT, false);
-                    } catch (IOException e) {
-
-                        Log.e(TAG, "Error Initializing TF Classifier " + e.toString());
+                        Log.i(TAG, "TF Classifier Re-Initialized successfully");
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error while Re-Initializing TF Classifier" + e.toString());
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "Error " + e.toString());
+                    Log.e(TAG, "Error Talking to GCS to fetch new config: " + e.toString());
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "Error " + e.toString());
-            }
-            finally {
+            } finally {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -329,7 +327,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                     ImageClassifierActivity.this);
             try {
                 mTensorFlowClassifier = new TensorFlowImageClassifier(ImageClassifierActivity.this,
-                        DEDAULT_MODEL_FILE, DEFAULT_LABELS_FILE, TF_INPUT_IMAGE_WIDTH, TF_INPUT_IMAGE_HEIGHT, true);
+                        DEFAULT_MODEL_FILE, DEFAULT_LABELS_FILE, TF_INPUT_IMAGE_WIDTH, TF_INPUT_IMAGE_HEIGHT, true);
             } catch (IOException e) {
                 throw new IllegalStateException("Cannot initialize TFLite Classifier", e);
             }
@@ -515,7 +513,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                         getProperties().getProperty(APPLICATION_NAME_PROPERTY))
                         .build();
             }catch (Exception e){
-                Log.e(TAG, "ERROR Getting a Storage Object: " + e.toString());
+                Log.e(TAG, "ERROR getting a Storage Object: " + e.toString());
             }
         }
         return sStorage;
@@ -568,7 +566,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                     int counter = 0;
                     while (it.hasNext()) {
                         Recognition r = it.next();
-                        sb.append(r.getTitle());
+                        sb.append(r.getTitle() + String.format("(%.1f%%)", r.getConfidence() * 100.0f));
                         counter++;
                         if (counter < results.size() - 1 ) {
                             sb.append(", ");
