@@ -19,11 +19,14 @@ import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
+import android.os.ParcelFileDescriptor;
 import android.util.Log;
 
 import com.example.androidthings.imageclassifier.classifier.Recognition;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,14 +45,10 @@ import java.util.PriorityQueue;
  */
 public class TensorFlowHelper {
 
-<<<<<<< HEAD
     private static final int RESULTS_TO_SHOW = 10;
-
-=======
-    private static final int RESULTS_TO_SHOW = 3;
     private static final int IMAGE_MEAN = 128;
     private static final float IMAGE_STD = 128.0f;
->>>>>>> e1be5a8ac0efdee9a314a293857dce73891b2325
+
     /**
      * Memory-map the model file in Assets.
      */
@@ -59,7 +58,9 @@ public class TensorFlowHelper {
         FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
         FileChannel fileChannel = inputStream.getChannel();
         long startOffset = fileDescriptor.getStartOffset();
+        Log.i("TF Helper", startOffset + "");
         long declaredLength = fileDescriptor.getDeclaredLength();
+        Log.i("TF Helper", declaredLength+ "");
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
     }
 
@@ -77,6 +78,36 @@ public class TensorFlowHelper {
             throw new IllegalStateException("Cannot read labels from " + labelsFile);
         }
     }
+
+    public static MappedByteBuffer loadModelFileFromCache(String modelFilePath)
+            throws IOException {
+        Log.i("TF Help", modelFilePath);
+        File modelFile = new File(modelFilePath);
+        FileInputStream inputStream = new FileInputStream(modelFile);
+        Log.i("TF Helper", inputStream + "");
+        FileChannel fileChannel = inputStream.getChannel();
+        long declaredLength =fileChannel.size();
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, declaredLength);
+    }
+
+    public static List<String> readLabelsFromCache(String labelsFile) {
+        ArrayList<String> result = new ArrayList<>();
+        File labelFile = new File(labelsFile);
+
+        try {
+            FileInputStream is = new FileInputStream(labelFile);
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
+            String line;
+            while ((line = br.readLine()) != null) {
+                result.add(line);
+            }
+            return result;
+        }
+         catch (Exception ex){
+                throw new IllegalStateException("Cannot read labels from " + labelsFile);
+            }
+        }
+
 
     /**
      * Find the best classifications.

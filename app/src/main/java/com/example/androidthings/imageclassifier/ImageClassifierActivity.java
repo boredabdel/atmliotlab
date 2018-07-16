@@ -16,10 +16,6 @@
 package com.example.androidthings.imageclassifier;
 
 import android.app.Activity;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.ServiceConnection;
-import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.media.Image;
@@ -28,7 +24,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.IBinder;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
@@ -51,9 +46,9 @@ import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.example.androidthings.imageclassifier.cloud.pubsub.CloudPublisherService;
 import com.example.androidthings.imageclassifier.cloud.pubsub.CloudPublisher;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
@@ -85,7 +80,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ImageClassifierActivity extends Activity implements ImageReader.OnImageAvailableListener {
-    private static final String GCS_KEY_FILE_PATH = "sa-key.p12";
+    private static final String GCS_KEY_FILE = "sa-key.p12";
     private static final String BUCKET_NAME = "at-test-upload01";
     private static final String REGISTRY_ID = "myregistry";
     private static final String DEVICE_ID = "newdevice";
@@ -108,6 +103,11 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private static final String APPLICATION_NAME =  "ml-bootcamp";
     private static final String ACCOUNT_ID = "iot-gcs-sa@iot-ml-bootcamp-2018.iam.gserviceaccount.com";
 
+
+    private static final String DEFAULT_LABELS_FILE = "labels.txt";
+    private static final String DEDAULT_MODEL_FILE = "model.tflite";
+
+
     /* Key code used by GPIO button to trigger image capture */
     private static final int SHUTTER_KEYCODE = KeyEvent.KEYCODE_CAMERA;
 
@@ -115,7 +115,6 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private CameraHandler mCameraHandler;
     private TensorFlowImageClassifier mTensorFlowClassifier;
     private String localFilePathInCache;
-    private String localModelPathInCache;
     private String gcsFilePath;
     private CloudPublisher mPublisher;
 
@@ -132,20 +131,19 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private MqttClient mqttClient;
 
     private AtomicBoolean mReady = new AtomicBoolean(false);
-    private CloudPublisherService mPublishService;
     private static MqttCallback mCallback;
-    private static JSONObject mjsonObject;
+    private static JSONObject mJsonObject;
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         try{
-            Log.i(TAG, "Reading GCS SA Key file");
+            Log.i(TAG, "Reading GCS Service Account Key file");
             AssetManager assets = getAssets();
-            gcsKeyFile = readFileFromStream(assets.open(GCS_KEY_FILE_PATH));
+            gcsKeyFile = readFileFromStream(assets.open(GCS_KEY_FILE));
         }catch(Exception e){
-            Log.i(TAG, "Failed Reading GCS SA Key file");
+            Log.i(TAG, "Failed Reading GCS Service Account Key file");
         }
         setContentView(R.layout.activity_camera);
         mImage = findViewById(R.id.imageView);
@@ -158,10 +156,11 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     }
 
     private void init() {
-        if (isAndroidThingsDevice(this)) {
-        }
+        // Initialize MQTT
         mqttAuth = new MqttAuthentication();
         mqttAuth.initialize();
+
+        // Export Certificate to Storage
         if( Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
             Log.i(TAG, "External Storage Stat " + Environment.getExternalStorageState());
             try {
@@ -180,6 +179,8 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         mBackgroundThread.start();
         mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
         mBackgroundHandler.post(mInitializeOnBackground);
+
+        // Listen to config changes.
         CloudIotOptions cloudIotOptions =
                 new CloudIotOptions(PROJECT_ID, REGISTRY_ID, DEVICE_ID, CLOUD_REGION);
         mPublisher = new MQTTPublisher(cloudIotOptions);
@@ -205,9 +206,19 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
             @Override
             public void messageArrived(String topic, MqttMessage message) throws Exception {
                 String payload = new String(message.getPayload());
-                mjsonObject = new JSONObject(payload);
-                Log.i(TAG, "Received Payload" + mjsonObject.toString());
-                mBackgroundHandler.post(mBackgroundGetModelFromGCS);
+                try {
+                    mJsonObject = new JSONObject(payload);
+                    Log.i(TAG, "New Config Received, processing");
+                    mReady.set(false);
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() { mResultText.setText("Config change received, processing....");
+                        }
+                    });
+                    mBackgroundHandler.post(mBackgroundGetModelFromGCS);
+                }catch (JSONException ex){
+                    Log.e(TAG, "Failed processing config payload " + payload);
+                }
             }
 
             @Override
@@ -225,26 +236,71 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         @Override
         public void run() {
             //Send the Image to GCS.
-            Log.i(TAG, "Getting Model from GCS to write image to GCS");
+            Log.i(TAG, "Getting new Model and Label from GCS ...");
+            String bucketName = "";
+            String modelFileName = "";
+            String labelsFileName = "";
+            File cachePath = new File(getCacheDir().toString());
+            try{
+                bucketName = mJsonObject.getString("bucket");
+                modelFileName = mJsonObject.getString("model");
+                labelsFileName = mJsonObject.getString("labels");
+            }catch(JSONException ex){
+                Log.e(TAG,"Error parsing Json payload" + mJsonObject);
+            }
             try {
                 Storage storage = getStorage();
                 try {
-                    String bucket_name = mjsonObject.getString("bucket");
-                    Log.i(TAG, bucket_name);
-                    String model_file = mjsonObject.getString("model");
-                    Log.i(TAG, model_file);
+                    // Downloading Model File
                     ByteArrayOutputStream modelStream = new ByteArrayOutputStream();
-                    Storage.Objects.Get getModel = storage.objects().get(bucket_name, model_file);
+                    Storage.Objects.Get getModel = storage.objects().get(bucketName, modelFileName);
                     getModel.getMediaHttpDownloader().setDirectDownloadEnabled(false);
                     getModel.executeMediaAndDownloadTo(modelStream);
-                    Log.i(TAG, "Got Model File : " + modelStream.toString());
+                    // Writing Model file to Local Cache
+                    String modelFilePath = cachePath + "/" + modelFileName;
+                    Log.i(TAG,"Writing Model to Local Cache: " + modelFilePath.toString());
+                    FileOutputStream modelFileFos = new FileOutputStream(modelFilePath);
+                    modelStream.writeTo(modelFileFos);
+                    modelFileFos.flush();
+                    modelFileFos.close();
+
+                    // Downloading Labels File
+                    ByteArrayOutputStream labelsStream = new ByteArrayOutputStream();
+                    Storage.Objects.Get getLabels = storage.objects().get(bucketName, labelsFileName);
+                    getModel.getMediaHttpDownloader().setDirectDownloadEnabled(false);
+                    getLabels.executeMediaAndDownloadTo(labelsStream);
+                    // Writing Model file to Local Cache
+                    String labelsFilePath = cachePath + "/" + labelsFileName;
+                    Log.i(TAG,"Writing Model to Local Cache: " + labelsFilePath.toString());
+                    FileOutputStream labelsFileFos = new FileOutputStream(labelsFilePath);
+                    labelsStream.writeTo(labelsFileFos);
+                    labelsFileFos.flush();
+                    labelsFileFos.close();
+
+                    // ReInitialize the TF model
+                    try {
+                        mTensorFlowClassifier = new TensorFlowImageClassifier(ImageClassifierActivity.this,
+                                modelFilePath, labelsFilePath, TF_INPUT_IMAGE_WIDTH, TF_INPUT_IMAGE_HEIGHT, false);
+                    } catch (IOException e) {
+
+                        Log.e(TAG, "Error Initializing TF Classifier " + e.toString());
+                    }
                 } catch (Exception e) {
-                    Log.e(TAG, "Error writing file to GCS " + e.toString());
+                    Log.e(TAG, "Error " + e.toString());
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Error " + e);
+                Log.e(TAG, "Error " + e.toString());
             }
-        };
+            finally {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        mResultText.setText(R.string.help_message);
+                        mReady.set(true);
+                    }
+                });
+            }
+        }
     };
 
     private File readFileFromStream(InputStream inStream){
@@ -273,7 +329,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                     ImageClassifierActivity.this);
             try {
                 mTensorFlowClassifier = new TensorFlowImageClassifier(ImageClassifierActivity.this,
-                        TF_INPUT_IMAGE_WIDTH, TF_INPUT_IMAGE_HEIGHT);
+                        DEDAULT_MODEL_FILE, DEFAULT_LABELS_FILE, TF_INPUT_IMAGE_WIDTH, TF_INPUT_IMAGE_HEIGHT, true);
             } catch (IOException e) {
                 throw new IllegalStateException("Cannot initialize TFLite Classifier", e);
             }
@@ -480,7 +536,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         });
 
         //Write Image to local Cache.
-        Log.i(TAG, "Trying to write image to local cache....");
+        Log.i(TAG, "Writing image to local cache....");
         File cachePath= new File(getCacheDir().toString());
         Long ts = System.currentTimeMillis();
         String filePath = cachePath + "/" + ts.toString() + ".jpg";
@@ -529,14 +585,6 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
             }
         });
         setReady(true);
-//        if (mTtsEngine != null) {
-//            // speak out loud the result of the image recognition
-//            mTtsSpeaker.speakResults(mTtsEngine, results);
-//        } else {
-//            // if theres no TTS, we don't need to wait until the utterance is spoken, so we set
-//            // to ready right away.
-//            setReady(true);
-//        }
     }
 
     @Override
@@ -561,39 +609,4 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
             // close quietly
         }
     }
-
-    /**
-     * @return true if this device is running Android Things.
-     *
-     * Source: https://stackoverflow.com/a/44171734/112705
-     */
-    private boolean isAndroidThingsDevice(Context context) {
-        // We can't use PackageManager.FEATURE_EMBEDDED here as it was only added in API level 26,
-        // and we currently target a lower minSdkVersion
-        final PackageManager pm = context.getPackageManager();
-        boolean isRunningAndroidThings = pm.hasSystemFeature("android.hardware.type.embedded");
-        Log.d(TAG, "isRunningAndroidThings: " + isRunningAndroidThings);
-        return isRunningAndroidThings;
-    }
-
-    /**
-     * Callback for service binding, passed to bindService()
-     */
-    private ServiceConnection mServiceConnection = new ServiceConnection() {
-
-        @Override
-        public void onServiceConnected(ComponentName className,
-                                       IBinder service) {
-            CloudPublisherService.LocalBinder binder = (CloudPublisherService.LocalBinder) service;
-            mPublishService = binder.getService();
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName arg0) {
-            mPublishService = null;
-        }
-    };
-
-
-
 }

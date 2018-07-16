@@ -35,9 +35,6 @@ public class TensorFlowImageClassifier {
 
     private static final String TAG = "TFImageClassifier";
 
-    private static final String LABELS_FILE = "labels.txt";
-    private static final String MODEL_FILE = "model.tflite";
-
     /** Dimensions of inputs. */
     private static final int DIM_BATCH_SIZE = 1;
     private static final int DIM_PIXEL_SIZE = 3;
@@ -60,10 +57,19 @@ public class TensorFlowImageClassifier {
     /**
      * Initializes a TensorFlow Lite session for classifying images.
      */
-    public TensorFlowImageClassifier(Context context, int inputImageWidth, int inputImageHeight)
+    public TensorFlowImageClassifier(Context context, String modelFile, String labelFile,
+                                     int inputImageWidth, int inputImageHeight, boolean isInAssets)
             throws IOException {
-        this.tfLite = new Interpreter(TensorFlowHelper.loadModelFile(context, MODEL_FILE));
-        this.labels = TensorFlowHelper.readLabels(context, LABELS_FILE);
+
+        if (isInAssets){
+            this.tfLite = new Interpreter(TensorFlowHelper.loadModelFile(context, modelFile));
+            this.labels = TensorFlowHelper.readLabels(context, labelFile);
+        }
+        else{
+            this.tfLite = new Interpreter(TensorFlowHelper.loadModelFileFromCache(modelFile));
+            this.labels = TensorFlowHelper.readLabelsFromCache(labelFile);
+        }
+
 
         imgData =
                 ByteBuffer.allocateDirect(
