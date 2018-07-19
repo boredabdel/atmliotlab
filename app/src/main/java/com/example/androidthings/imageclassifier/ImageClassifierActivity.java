@@ -63,8 +63,6 @@ import com.google.api.services.storage.Storage;
 
 
 import java.io.ByteArrayOutputStream;
-import java.util.Properties;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -83,8 +81,11 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private static final String GCS_KEY_FILE = "sa-key.p12";
     private static final String BUCKET_NAME = "at-test-upload01";
     private static final String REGISTRY_ID = "myregistry";
-    private static final String DEVICE_ID = "newdevice";
+    private static final String DEVICE_ID = "device01";
     private static final String CLOUD_REGION = "europe-west1";
+    private static final String PROJECT_ID =  "iot-ml-bootcamp-2018";
+    private static final String ACCOUNT_ID = "iot-gcs-sa@iot-ml-bootcamp-2018.iam.gserviceaccount.com";
+
 
     private static final String TAG = "ImageClassifierActivity";
     private static final int PREVIEW_IMAGE_WIDTH = 640;
@@ -93,12 +94,6 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private static final int TF_INPUT_IMAGE_HEIGHT = 224;
     private static Storage sStorage;
     private static File gcsKeyFile;
-
-
-    private static final String PROJECT_ID =  "iot-ml-bootcamp-2018";
-    //private static final String APPLICATION_NAME =  "ml-bootcamp";
-    private static final String ACCOUNT_ID = "iot-gcs-sa@iot-ml-bootcamp-2018.iam.gserviceaccount.com";
-
 
     private static final String DEFAULT_LABELS_FILE = "labels.txt";
     private static final String DEFAULT_MODEL_FILE = "model.tflite";
@@ -202,19 +197,22 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
             @Override
             public void messageArrived(String topic, MqttMessage message) throws Exception {
                 String payload = new String(message.getPayload());
-                try {
-                    mJsonObject = new JSONObject(payload);
-                    Log.i(TAG, "New Config Received, processing");
-                    mReady.set(false);
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() { mResultText.setText("Config change received, processing....");
-                        }
-                    });
-                    mBackgroundHandler.post(mBackgroundGetModelFromGCS);
-                }catch (JSONException ex){
-                    Log.e(TAG, "Failed processing config payload " + payload);
+                if (! payload.isEmpty()){
+                    try {
+                        mJsonObject = new JSONObject(payload);
+                        Log.i(TAG, "New Config Received, processing");
+                        mReady.set(false);
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() { mResultText.setText("Config change received, processing....");
+                            }
+                        });
+                        mBackgroundHandler.post(mBackgroundGetModelFromGCS);
+                    }catch (JSONException ex){
+                        Log.e(TAG, "Failed processing config payload " + payload);
+                    }
                 }
+
             }
 
             @Override
