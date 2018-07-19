@@ -550,7 +550,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                     int counter = 0;
                     while (it.hasNext()) {
                         Recognition r = it.next();
-                        sb.append(r.getTitle() + String.format("(%.1f%%)", r.getConfidence() * 100.0f));
+                        sb.append(r.getTitle() + String.format("(%.2f%%)", (r.getConfidence() * 100.0f) * 100));
                         counter++;
                         if (counter < results.size() - 1 ) {
                             sb.append(", ");
