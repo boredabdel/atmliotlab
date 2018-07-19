@@ -88,6 +88,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
 
 
     private static final String TAG = "ImageClassifierActivity";
+    private static final String APPLICATION_NAME = "iot-ml-image-classifier";
     private static final int PREVIEW_IMAGE_WIDTH = 640;
     private static final int PREVIEW_IMAGE_HEIGHT = 480;
     private static final int TF_INPUT_IMAGE_WIDTH = 224;
@@ -195,7 +196,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
             }
 
             @Override
-            public void messageArrived(String topic, MqttMessage message) throws Exception {
+            public void messageArrived(String topic, MqttMessage message){
                 String payload = new String(message.getPayload());
                 if (! payload.isEmpty()){
                     try {
@@ -493,7 +494,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                         .setServiceAccountScopes(scopes).build();
 
                 sStorage = new Storage.Builder(httpTransport, jsonFactory,
-                        credential).build();
+                        credential).setApplicationName(APPLICATION_NAME).build();
             }catch (Exception e){
                 Log.e(TAG, "ERROR getting a Storage Object: " + e.toString());
             }
