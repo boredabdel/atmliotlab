@@ -92,15 +92,11 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private static final int TF_INPUT_IMAGE_WIDTH = 224;
     private static final int TF_INPUT_IMAGE_HEIGHT = 224;
     private static Storage sStorage;
-    private static Properties sProperties;
     private static File gcsKeyFile;
 
-    private static final String PROJECT_ID_PROPERTY = "project.id";
-    private static final String APPLICATION_NAME_PROPERTY = "application.name";
-    private static final String ACCOUNT_ID_PROPERTY = "account.id";
 
     private static final String PROJECT_ID =  "iot-ml-bootcamp-2018";
-    private static final String APPLICATION_NAME =  "ml-bootcamp";
+    //private static final String APPLICATION_NAME =  "ml-bootcamp";
     private static final String ACCOUNT_ID = "iot-gcs-sa@iot-ml-bootcamp-2018.iam.gserviceaccount.com";
 
 
@@ -357,6 +353,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                 Storage storage = getStorage();
                 File file = new File(localFilePathInCache);
                 FileInputStream stream = new FileInputStream(file);
+                Log.i(TAG, localFilePathInCache);
                 try {
                     StorageObject objectMetadata = new StorageObject();
                     objectMetadata.setBucket(BUCKET_NAME);
@@ -364,9 +361,9 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                     InputStreamContent content = new InputStreamContent(contentType, stream);
                     Storage.Objects.Insert insert = storage.objects().insert(
                             BUCKET_NAME, objectMetadata, content);
+                    gcsFilePath = "gs://" + BUCKET_NAME + "/" + file.getName();
                     insert.setName(file.getName());
                     insert.execute();
-                    gcsFilePath = "gs://" + BUCKET_NAME + "/" + file.getName();
                     Log.i(TAG, "File uploaded to GCS Successfully : " + gcsFilePath);
                     //Try to Publish to PubSub
                     runOnUiThread(new Runnable() {
@@ -483,16 +480,6 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         mReady.set(ready);
     }
 
-    private static Properties getProperties() throws Exception {
-        if (sProperties == null) {
-            sProperties = new Properties();
-            sProperties.setProperty(PROJECT_ID_PROPERTY, PROJECT_ID);
-            sProperties.setProperty(APPLICATION_NAME_PROPERTY, APPLICATION_NAME);
-            sProperties.setProperty(ACCOUNT_ID_PROPERTY, ACCOUNT_ID);
-        }
-        return sProperties;
-    }
-
     private static Storage getStorage() {
         if (sStorage == null) {
             HttpTransport httpTransport = new NetHttpTransport();
@@ -503,15 +490,12 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                 Credential credential = new GoogleCredential.Builder()
                         .setTransport(httpTransport)
                         .setJsonFactory(jsonFactory)
-                        .setServiceAccountId(
-                                getProperties().getProperty(ACCOUNT_ID_PROPERTY))
+                        .setServiceAccountId(ACCOUNT_ID)
                         .setServiceAccountPrivateKeyFromP12File(gcsKeyFile)
                         .setServiceAccountScopes(scopes).build();
 
                 sStorage = new Storage.Builder(httpTransport, jsonFactory,
-                        credential).setApplicationName(
-                        getProperties().getProperty(APPLICATION_NAME_PROPERTY))
-                        .build();
+                        credential).build();
             }catch (Exception e){
                 Log.e(TAG, "ERROR getting a Storage Object: " + e.toString());
             }
@@ -540,7 +524,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         String filePath = cachePath + "/" + ts.toString() + ".jpg";
         try{
             FileOutputStream os = new FileOutputStream(filePath);
-            //bitmap.compress(Bitmap.CompressFormat.JPEG, 10, os);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 10, os);
             os.flush();
             os.close();
             Log.i(TAG, "Image written to local Cache: " + filePath);
