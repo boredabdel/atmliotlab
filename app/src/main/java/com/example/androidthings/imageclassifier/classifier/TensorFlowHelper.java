@@ -94,7 +94,6 @@ public class TensorFlowHelper {
     public static List<String> readLabelsFromCache(String labelsFile) {
         ArrayList<String> result = new ArrayList<>();
         File labelFile = new File(labelsFile);
-
         try {
             FileInputStream is = new FileInputStream(labelFile);
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
@@ -102,7 +101,9 @@ public class TensorFlowHelper {
             while ((line = br.readLine()) != null) {
                 result.add(line);
             }
+            Log.i("Labels", result.toString());
             return result;
+
         }
          catch (Exception ex){
                 throw new IllegalStateException("Cannot read labels from " + labelsFile);
@@ -115,32 +116,42 @@ public class TensorFlowHelper {
       */
     public static Collection<Recognition> getBestResults(float[][] labelProbArray,
                                                          List<String> labelList) {
-        PriorityQueue<Recognition> sortedLabels = new PriorityQueue<>(RESULTS_TO_SHOW,
+        PriorityQueue<Recognition> sortedLabels = new PriorityQueue<>(
+                RESULTS_TO_SHOW,
                 new Comparator<Recognition>() {
                     @Override
                     public int compare(Recognition lhs, Recognition rhs) {
-                        return Float.compare(lhs.getConfidence(), rhs.getConfidence());
+                        return Float.compare(rhs.getConfidence(),lhs.getConfidence());
                     }
                 });
 
 
         for (int i = 0; i < labelList.size(); ++i) {
-            Recognition r = new Recognition( String.valueOf(i),
-                    labelList.get(i), (labelProbArray[0][i]) / 255.0f);
+            Recognition r = new Recognition(
+                    String.valueOf(i),
+                    labelList.get(i),
+                    labelProbArray[0][i]
+                   // (labelProbArray[0][i]) / 255.0f
+            );
             sortedLabels.add(r);
-            if (r.getConfidence() > 0) {
-                Log.d("ImageRecognition", r.toString());
-            }
-            if (sortedLabels.size() > RESULTS_TO_SHOW) {
-                sortedLabels.poll();
-            }
+//            if (r.getConfidence() > 0) {
+//                Log.d("ImageRecognition", r.toString());
+//            }
+//            if (sortedLabels.size() > RESULTS_TO_SHOW) {
+//                sortedLabels.poll();
+//            }
         }
 
-        List<Recognition> results = new ArrayList<>(RESULTS_TO_SHOW);
-        for (Recognition r: sortedLabels) {
-            results.add(0, r);
-        }
+//        List<Recognition> results = new ArrayList<>(RESULTS_TO_SHOW);
+//        for (Recognition r: sortedLabels) {
+//            results.add(0, r);
+//        }
 
+        List<Recognition> results= new ArrayList<>();
+        int len = sortedLabels.size();
+        for (int i = 0; i< len && i < RESULTS_TO_SHOW; i++){
+            results.add(sortedLabels.poll());
+        }
         return results;
     }
 

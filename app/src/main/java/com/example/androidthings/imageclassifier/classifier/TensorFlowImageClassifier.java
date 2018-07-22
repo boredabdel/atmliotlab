@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -101,11 +102,17 @@ public class TensorFlowImageClassifier {
         long startTime = SystemClock.uptimeMillis();
         // Here's where the magic happens!!!
         tfLite.run(imgData, confidencePerLabel);
+//        int length = confidencePerLabel.length;
+//        for(int i=0; i< length;i++){
+//            for (int j=0; j < confidencePerLabel[i].length;j++){
+//                Log.w(TAG,"Predicted values:" + i + " " + j +" "+ confidencePerLabel[i][j]);
+//            }
+//        }
         long endTime = SystemClock.uptimeMillis();
         Log.d(TAG, "Timecost to run model inference: " + Long.toString(endTime - startTime));
 
         // Get the results with the highest confidence and map them to their labels
-        return TensorFlowHelper.getBestResults(confidencePerLabel, labels);
+       return TensorFlowHelper.getBestResults(confidencePerLabel, labels);
     }
 
 }

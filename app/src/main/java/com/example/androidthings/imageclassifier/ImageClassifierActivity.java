@@ -81,7 +81,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
     private static final String GCS_KEY_FILE = "sa-key.p12";
     private static final String BUCKET_NAME = "at-test-upload01";
     private static final String REGISTRY_ID = "myregistry";
-    private static final String DEVICE_ID = "device01";
+    private static final String DEVICE_ID = "device02";
     private static final String CLOUD_REGION = "europe-west1";
     private static final String PROJECT_ID =  "iot-ml-bootcamp-2018";
     private static final String ACCOUNT_ID = "iot-gcs-sa@iot-ml-bootcamp-2018.iam.gserviceaccount.com";
@@ -508,31 +508,12 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
         try (Image image = reader.acquireNextImage()) {
             bitmap = mImagePreprocessor.preprocessImage(image);
         }
-
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 mImage.setImageBitmap(bitmap);
             }
         });
-
-        //Write Image to local Cache.
-        Log.i(TAG, "Writing image to local cache....");
-        File cachePath= new File(getCacheDir().toString());
-        Long ts = System.currentTimeMillis();
-        String filePath = cachePath + "/" + ts.toString() + ".jpg";
-        try{
-            FileOutputStream os = new FileOutputStream(filePath);
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 10, os);
-            os.flush();
-            os.close();
-            Log.i(TAG, "Image written to local Cache: " + filePath);
-            localFilePathInCache = filePath;
-        }catch (FileNotFoundException e){
-            Log.e(TAG,"Destination not found: " + filePath);
-        }catch(IOException e){
-            Log.e(TAG,"Error writing file to Cache: " + filePath);
-        }
 
         final Collection<Recognition> results = mTensorFlowClassifier.doRecognize(bitmap);
 
@@ -549,7 +530,7 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                     int counter = 0;
                     while (it.hasNext()) {
                         Recognition r = it.next();
-                        sb.append(r.getTitle() + String.format("(%.2f%%)", (r.getConfidence() * 100.0f) * 100));
+                        sb.append(r.getTitle() + String.format("(%.2f%%)", (r.getConfidence() * 100)));
                         counter++;
                         if (counter < results.size() - 1 ) {
                             sb.append(", ");
@@ -565,6 +546,25 @@ public class ImageClassifierActivity extends Activity implements ImageReader.OnI
                 }
             }
         });
+
+        //Write Image to local Cache.
+        Log.i(TAG, "Writing image to local cache....");
+        File cachePath= new File(getCacheDir().toString());
+        Long ts = System.currentTimeMillis();
+        String filePath = cachePath + "/" + ts.toString() + ".jpg";
+        try{
+            FileOutputStream os = new FileOutputStream(filePath);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 99, os);
+            os.flush();
+            os.close();
+            Log.i(TAG, "Image written to local Cache: " + filePath);
+            localFilePathInCache = filePath;
+        }catch (FileNotFoundException e){
+            Log.e(TAG,"Destination not found: " + filePath);
+        }catch(IOException e){
+            Log.e(TAG,"Error writing file to Cache: " + filePath);
+        }
+        
         setReady(true);
     }
 

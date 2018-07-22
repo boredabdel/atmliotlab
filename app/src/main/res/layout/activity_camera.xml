@@ -98,29 +98,48 @@
 
     <RadioGroup
         android:id="@+id/labelButtons"
-        android:layout_width="216dp"
-        android:layout_height="67dp"
+        android:layout_width="248dp"
+        android:layout_height="158dp"
         android:layout_alignParentTop="true"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="41dp"
+        android:background="@android:color/holo_green_dark"
         android:visibility="invisible">
 
         <RadioButton
-            android:id="@+id/marsLabel"
+            android:id="@+id/snickersLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:checked="false"
+            android:text="@string/snickersText"
+            tools:text="@string/snickersText" />
+
+        <RadioButton
+            android:id="@+id/twixLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:checked="true"
-            android:text="@string/marsText"
-            tools:text="@string/marsText" />
+            android:text="@string/twixText"
+            tools:text="@string/twixText" />
 
         <RadioButton
-            android:id="@+id/bountyLabel"
+            android:id="@+id/babyruthLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/bountyText"
-            tools:text="@string/bountyText" />
+            android:checked="false"
+            android:text="@string/babyruthText"
+            tools:text="@string/babyruthText" />
+
+        <RadioButton
+            android:id="@+id/almondjoyLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/almondjoyText"
+            tools:text="@string/almondjoyText" />
     </RadioGroup>
 
 </RelativeLayout>

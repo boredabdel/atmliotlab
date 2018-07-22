@@ -21,7 +21,10 @@
     <string name="help_message">Point the camera and touch the screen</string>
     <string name="sendtocloud">Send To Cloud</string>
     <string name="cancel">cancel</string>
-    <string name="marsText">Mars</string>
-    <string name="bountyText">Bounty</string>
     <string name="confirmSendTxt">Send</string>
+    <string name="snickersText">Snickers</string>
+    <string name="twixText">Twix</string>
+    <string name="almondjoyText">Almondjoy</string>
+    <string name="babyruthText">Babyruth</string>
+
 </resources>
