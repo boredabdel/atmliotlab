@@ -78,6 +78,7 @@ public class CameraHandler {
         String[] camIds = null;
         try {
             camIds = manager.getCameraIdList();
+            Log.i(TAG,"available Cameras" + camIds.length);
         } catch (CameraAccessException e) {
             Log.w(TAG, "Cannot get the list of available cameras", e);
         }

@@ -79,12 +79,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ImageClassifierActivity extends Activity implements ImageReader.OnImageAvailableListener {
     private static final String GCS_KEY_FILE = "sa-key.p12";
-    private static final String BUCKET_NAME = "at-test-upload01";
-    private static final String REGISTRY_ID = "myregistry";
-    private static final String DEVICE_ID = "device02";
+    private static final String BUCKET_NAME = "cloud-stockholm-summit-demo";
+    private static final String REGISTRY_ID = "registry01";
+    private static final String DEVICE_ID = "device01";
     private static final String CLOUD_REGION = "europe-west1";
-    private static final String PROJECT_ID =  "iot-ml-bootcamp-2018";
-    private static final String ACCOUNT_ID = "iot-gcs-sa@iot-ml-bootcamp-2018.iam.gserviceaccount.com";
+    private static final String PROJECT_ID =  "balmy-amp-222309";
+    private static final String ACCOUNT_ID = "iot-sa@balmy-amp-222309.iam.gserviceaccount.com";
 
 
     private static final String TAG = "ImageClassifierActivity";
